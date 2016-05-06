@@ -21,6 +21,8 @@ map< pair<int, int> , vector<pair<int, int> > > intervalTree;
 map< pair<int, int> , pair<int, int> > inverseIntervalTree;
 pair<int, int>* correspondingInterval;
 map< pair<int, int> , int> levelMap;
+map< pair<int, int> , bool> locked;
+map< pair<int, int> , bool> intentionLocked;
 
 void updateParent(int parent, int node) {
     if(parent == -1)
@@ -220,12 +222,78 @@ double getCost(vector<pair<int, int> > intervals) {
     for(vector<pair<int, int> >::iterator it = intervals.begin(); it != intervals.end(); ++it) {
         cout << "(" <<(*it).first <<","<<(*it).second<<")";
     }
-    cout << endl;
     for(vector<pair<int, int> >::iterator it = intervals.begin(); it != intervals.end(); ++it) {
         cost += 0.3*((*it).second - (*it).first + 1);
     }
+    cout << " " << cost << " ";
     cost += 0.7*intervals.size();
+    cout << 0.7*intervals.size() << " " << cost << endl;
     return cost;
+}
+
+void printITree(queue<pair<int, int> > q) {
+    pair<int, int> i = q.front();
+    q.pop();
+    cout << "(" << i.first << "," << i.second << ")" << endl;
+    for(vector<pair<int, int> >::iterator it = intervalTree[i].begin() ; it != intervalTree[i].end(); ++it) {
+        q.push(*it);
+    }
+    if(q.size() != 0) {
+        printITree(q);
+    }
+}
+
+void printIntervalTree() {
+    queue<pair<int, int> > q;
+    q.push(interval[0]);
+    printITree(q);
+}
+
+bool lockIntervalsInIntervalTree(vector<pair<int, int> > lockIntervals) {
+    if(locked[interval[0]]) {
+        return false;
+    }
+    for(vector<pair<int, int> >::iterator it = lockIntervals.begin(); it != lockIntervals.end(); ++it) {
+        pair<int, int> itvl = *it;
+        while(!(itvl.first == interval[0].first and itvl.second == interval[0].second)) {
+            if(locked[itvl]) {
+                return false;
+            }
+            itvl = inverseIntervalTree[itvl];
+        }
+        if(intentionLocked[itvl]) {
+            return false;
+        }
+    }
+    for(vector<pair<int, int> >::iterator it = lockIntervals.begin(); it != lockIntervals.end(); ++it) {
+        pair<int, int> itvl = *it;
+        intentionLocked[interval[0]] = true;
+        while(!(itvl.first == interval[0].first and itvl.second == interval[0].second)) {
+            intentionLocked[itvl] = true;
+            itvl = inverseIntervalTree[itvl];
+        }
+        locked[itvl] = true;
+    }
+    return true;
+}
+
+void UpdateIntentionLockedFlags(pair<int, int> p) {
+    intentionLocked[p] = false;
+    while(!(p.first == interval[0].first and p.second == interval[0].second)) {
+        p = inverseIntervalTree[p];
+        for(vector<pair<int, int> >::iterator it = intervalTree[p].begin(); it != intervalTree[p].end(); ++it) {
+            if(intentionLocked[(*it)])
+                return;
+        }
+        intentionLocked[p] = false;
+    }
+    p = interval[0];
+    for(vector<pair<int, int> >::iterator it = intervalTree[p].begin(); it != intervalTree[p].end(); ++it) {
+        if(intentionLocked[(*it)])
+            return;
+    }
+    intentionLocked[p] = false;
+    return;
 }
 
 int main(int argc, char* argv[]) {
@@ -277,6 +345,8 @@ int main(int argc, char* argv[]) {
                     if(!(levelWiseIntervals[i][j].first == levelWiseIntervals[i+1][k].first and levelWiseIntervals[i][j].second == levelWiseIntervals[i+1][k].second)) {
                     intervalTree[levelWiseIntervals[i][j]].push_back(levelWiseIntervals[i+1][k]);
                     inverseIntervalTree[levelWiseIntervals[i+1][k]] = levelWiseIntervals[i][j];
+                    locked[levelWiseIntervals[i][j]] = false;
+                    intentionLocked[levelWiseIntervals[i][j]] = false;
                     }
                     kprev = k;
                 }
@@ -289,6 +359,7 @@ int main(int argc, char* argv[]) {
     for(int i = 0; i < nodes; i++) {
         correspondingInterval[i] = getBestMatch(interval[i], interval[0]);
     }
+    map<vector<int>, vector<pair<int, int> > > lockedIntervalMap;
 //     inverseIntervalTree[interval[0]] = NULL;
     while (true) {
         string s;
@@ -301,12 +372,15 @@ int main(int argc, char* argv[]) {
             int temp;
             set<pair<int, int> > list;
             vector<pair<int, int> > lockIntervals;
+            vector<int> inputNodes;
             for(int i = 0; i < numnodes; i++) {
                 cin >> temp;
+                inputNodes.push_back(temp);
                 list.insert(correspondingInterval[temp]);
             }
+            sort(inputNodes.begin(), inputNodes.end());
             vector<vector<pair<int, int> > > pathList;
-            vector< pair<int, int> >* IntervalLevels = new vector< pair<int, int> > [maxLevel+1];
+            set< pair<int, int> >* IntervalLevels = new set< pair<int, int> > [maxLevel+1];
             for(set<pair<int, int> >::iterator it = list.begin(); it != list.end(); ++it) {
                 vector<pair<int, int> > v;
                 pair<int, int> itvl = *it;
@@ -314,14 +388,14 @@ int main(int argc, char* argv[]) {
                 while(!(itvl.first == interval[0].first and itvl.second == interval[0].second)) {
                     v.push_back(itvl);
                     itvl = inverseIntervalTree[itvl];
-                    IntervalLevels[levelMap[itvl]].push_back(itvl);
+                    IntervalLevels[levelMap[itvl]].insert(itvl);
                 }
                 v.push_back(interval[0]);
                 pathList.push_back(v);
             }
             double currentCost = getCost(lockIntervals);
             for(int i = maxLevel; i >= 0; i--) {
-                for(vector< pair<int, int> >::iterator it = IntervalLevels[i].begin(); it != IntervalLevels[i].end(); ++it) {
+                for(set< pair<int, int> >::iterator it = IntervalLevels[i].begin(); it != IntervalLevels[i].end(); ++it) {
                     vector<pair<int, int> > tempList;
                     tempList.push_back(*it);
                     for(int l = 0; l <= lockIntervals.size(); l++) {
@@ -329,33 +403,47 @@ int main(int argc, char* argv[]) {
                             tempList.push_back(lockIntervals[i]);
                         }
                     }
-                    if(getCost(tempList) < currentCost) {
-                        currentCost = getCost(tempList);
-                        lockIntervals = tempList;
+                    if(tempList.size() < lockIntervals.size()) {
+                        int newCost = getCost(tempList);
+                        if(newCost < currentCost) {
+                            currentCost = newCost;
+                            lockIntervals = tempList;
+                        }
                     }
                 }
             }
+            cout << "Optimal Lock option:";
             for(vector<pair<int, int> >::iterator it = lockIntervals.begin(); it != lockIntervals.end(); ++it) {
-                cout << "("<<(*it).first<<","<<(*it).second<<"),";
+                cout << "("<<(*it).first<<","<<(*it).second<<")";
             }
             cout << endl;
+            bool status = lockIntervalsInIntervalTree(lockIntervals);
+            if(status == true) {
+                lockedIntervalMap[inputNodes] = lockIntervals;
+                cout << "lock is successful" << endl;
+            }
+            else
+                cout << "lock is unsuccessful" << endl;
         }
         if ( s == "unlock" ) {
             int temp;
-            vector<pair<int, int> > list;
+            vector<int> inputNodes;
             for(int i = 0; i < numnodes; i++) {
                 cin >> temp;
-                list.push_back(interval[temp]);
+                inputNodes.push_back(temp);
             }
-            sort(list.begin(), list.end(), compare);
-            list = vectorMerge(list);
-            list = generateIntervals(list);
-            int prevSize = lockList.size();
-            lockList = lockRemove(list, lockList);
-            if(prevSize > lockList.size())
-                cout << "Unlock was successful" << endl;
-            else
-                cout << "Unlock was unsuccessful" << endl;
+            sort(inputNodes.begin(), inputNodes.end());
+            if(lockedIntervalMap.find(inputNodes) != lockedIntervalMap.end()) {
+                for(vector<pair<int, int> >::iterator it = lockedIntervalMap[inputNodes].begin(); it != lockedIntervalMap[inputNodes].end(); ++it) {
+                    locked[(*it)] = false;
+                    UpdateIntentionLockedFlags(*it);
+                }
+                cout << "unlock is successful" << endl;
+                lockedIntervalMap.erase(lockedIntervalMap.find(inputNodes));
+            }
+            else {
+                cout << "Illegal unlock operation" << endl;
+            }
         }
     }
     return 0;
