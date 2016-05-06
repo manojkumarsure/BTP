@@ -1,0 +1,16 @@
+To compile:
+g++ HLocks.cpp
+
+To run:
+./a.out <inputfile>
+
+<inputfile> structure:
+It has only one root namely 0(it there are multiple source nodes, add node 0 on top of them)
+Other nodes are numbered from 1,2,3,....
+
+Line 1 : <num_nodes> <num_edges>
+Lines 2 to num_edges+1(list of edges) : <src_node> <dst_node>
+
+In the command line(while running):
+lock <num_nodes> <node1> <node2> ....
+unlock <num_nodes> <node1> <node2> ....
