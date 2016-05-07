@@ -398,13 +398,13 @@ int main(int argc, char* argv[]) {
                 for(set< pair<int, int> >::iterator it = IntervalLevels[i].begin(); it != IntervalLevels[i].end(); ++it) {
                     vector<pair<int, int> > tempList;
                     tempList.push_back(*it);
-                    for(int l = 0; l <= lockIntervals.size(); l++) {
-                        if(!subsume(lockIntervals[i], *it)) {
-                            tempList.push_back(lockIntervals[i]);
+                    for(int l = 0; l < lockIntervals.size(); l++) {
+                        if(!subsume(lockIntervals[l], *it)) {
+                            tempList.push_back(lockIntervals[l]);
                         }
                     }
                     if(tempList.size() < lockIntervals.size()) {
-                        int newCost = getCost(tempList);
+                        double newCost = getCost(tempList);
                         if(newCost < currentCost) {
                             currentCost = newCost;
                             lockIntervals = tempList;
@@ -412,6 +412,7 @@ int main(int argc, char* argv[]) {
                     }
                 }
             }
+            sort(lockIntervals.begin(), lockIntervals.end(), compare);
             cout << "Optimal Lock option:";
             for(vector<pair<int, int> >::iterator it = lockIntervals.begin(); it != lockIntervals.end(); ++it) {
                 cout << "("<<(*it).first<<","<<(*it).second<<")";
